@@ -1,22 +1,34 @@
 #!/usr/bin/env bash
-# Install session-limit-recovery skill for Claude Code
-# Usage: curl -fsSL https://raw.githubusercontent.com/Nightmare17726/session-limit-recovery/main/install.sh | bash
+# Install a skill from Nightmare17726/my-claude-skills for Claude Code
+# Usage:
+#   Install one skill:  curl -fsSL https://raw.githubusercontent.com/Nightmare17726/my-claude-skills/main/install.sh | bash -s session-limit-recovery
+#   Install all skills: curl -fsSL https://raw.githubusercontent.com/Nightmare17726/my-claude-skills/main/install.sh | bash
 
 set -e
 
-REPO="Nightmare17726/session-limit-recovery"
-SKILL_DIR="$HOME/.claude/skills/session-limit-recovery"
+REPO="Nightmare17726/my-claude-skills"
 RAW="https://raw.githubusercontent.com/$REPO/main"
+SKILLS_DIR="$HOME/.claude/skills"
 
-echo "Installing session-limit-recovery skill..."
+# If a skill name is passed as argument, install just that one.
+# Otherwise, install all skills listed in skills/
+install_skill() {
+  local skill="$1"
+  local dest="$SKILLS_DIR/$skill"
+  echo "Installing $skill..."
+  mkdir -p "$dest"
+  curl -fsSL "$RAW/skills/$skill/SKILL.md" -o "$dest/SKILL.md"
+  echo "  -> $dest/SKILL.md"
+}
 
-mkdir -p "$SKILL_DIR"
+if [ -n "$1" ]; then
+  install_skill "$1"
+else
+  # Install all known skills
+  for skill in session-limit-recovery; do
+    install_skill "$skill"
+  done
+fi
 
-curl -fsSL "$RAW/skills/session-limit-recovery/SKILL.md" -o "$SKILL_DIR/SKILL.md"
-
-echo "Done. Skill installed to: $SKILL_DIR"
 echo ""
-echo "Usage:"
-echo "  - Claude will apply it automatically to any multi-step task"
-echo "  - To resume after a limit reset: start a new session and say 'resume from checkpoint'"
-echo "  - Checkpoints are saved to: ~/.claude/recovery/checkpoint.md"
+echo "Done. Skills installed to: $SKILLS_DIR"
