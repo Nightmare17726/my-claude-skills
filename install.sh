@@ -17,40 +17,34 @@ install_skill() {
   echo "Installing $skill..."
   mkdir -p "$dest"
   curl -fsSL "$RAW/skills/$skill/SKILL.md" -o "$dest/SKILL.md"
+  echo "  -> $dest/SKILL.md"
 
-  # Install any hook scripts bundled with the skill
-  if curl -fsSL --head "$RAW/skills/$skill/hooks/session-start.sh" 2>/dev/null | grep -q "200"; then
+  # Install hook script if present
+  local hook_url="$RAW/skills/$skill/hooks/session-start.sh"
+  if curl -fsSL --head "$hook_url" 2>/dev/null | grep -q "200"; then
     mkdir -p "$dest/hooks"
-    curl -fsSL "$RAW/skills/$skill/hooks/session-start.sh" -o "$dest/hooks/session-start.sh"
+    curl -fsSL "$hook_url" -o "$dest/hooks/session-start.sh"
     chmod +x "$dest/hooks/session-start.sh"
     echo "  -> $dest/hooks/session-start.sh"
   fi
-
-  echo "  -> $dest/SKILL.md"
 }
 
 register_hooks() {
-  echo "Registering SessionStart hook in $SETTINGS..."
+  echo "Registering SessionStart hook..."
+  [ ! -f "$SETTINGS" ] && echo '{}' > "$SETTINGS"
 
-  # Create settings.json if it doesn't exist
-  if [ ! -f "$SETTINGS" ]; then
-    echo '{}' > "$SETTINGS"
-  fi
-
-  # Use python3 to safely merge the hook into existing settings
   python3 - <<'PYEOF'
-import json, os, sys
+import json, os
 
 settings_path = os.path.expanduser("~/.claude/settings.json")
 hook_command = "bash ~/.claude/skills/session-limit-recovery/hooks/session-start.sh"
 
-with open(settings_path, "r") as f:
+with open(settings_path) as f:
     s = json.load(f)
 
 hooks = s.setdefault("hooks", {})
 session_start = hooks.setdefault("SessionStart", [])
 
-# Check if already registered
 already = any(
     h.get("type") == "command" and h.get("command") == hook_command
     for entry in session_start
@@ -67,10 +61,18 @@ else:
 PYEOF
 }
 
+ALL_SKILLS=(
+  session-limit-recovery
+  token-budget-guardian
+  secure-by-default
+  design-system-first
+  progressive-complexity
+)
+
 if [ -n "$1" ]; then
   install_skill "$1"
 else
-  for skill in session-limit-recovery; do
+  for skill in "${ALL_SKILLS[@]}"; do
     install_skill "$skill"
   done
 fi
