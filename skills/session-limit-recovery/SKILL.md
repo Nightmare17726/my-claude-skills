@@ -73,7 +73,7 @@ To continue: open a new Claude Code session and say "resume from checkpoint"
 When Claude Code shows a usage limit message, or you detect you're near the limit:
 
 1. **Finish the current atomic operation** (don't stop mid-function or mid-file)
-2. **Update the checkpoint** with current state
+2. **Update the checkpoint** with current state — remove the "Resume Command" line and update `status: in_progress`
 3. **Report to user:**
 
 ```
@@ -87,37 +87,54 @@ Remaining:
 - [ ] Step 3: ...
 - [ ] Step 4: ...
 
-Next step when you resume: <exact description of what to do next>
-
 Your limit resets at approximately <time shown by Claude Code>.
-To resume: start a new session and say "resume from checkpoint"
+The next session will resume automatically — no input needed.
 ```
 
 4. **Stop working.** Do not attempt further steps.
 
 ---
 
-### Phase 3: Auto-Resume (new session)
+### Phase 3: Auto-Resume (new session — fully automatic)
 
-At the start of a new session, check for a checkpoint:
+**This is handled by a SessionStart hook.** No user input is required.
 
-```bash
-cat ~/.claude/recovery/checkpoint.md 2>/dev/null
-```
+When a new session starts, the hook at `~/.claude/skills/session-limit-recovery/hooks/session-start.sh` runs automatically. If `~/.claude/recovery/checkpoint.md` exists with `status: in_progress`, it injects the checkpoint into the session context with a resume instruction.
 
-If found and `status: in_progress`:
+Claude must:
 
-1. Read the full checkpoint
-2. Announce: "Found an in-progress checkpoint. Resuming: <task name>"
-3. Show what was completed and what remains
-4. Ask: "Ready to continue from Step <N>: <description>? (yes/no)"
-5. On confirmation — continue exactly from Current Position
+1. Announce: "Resuming: <task name> — continuing from Step N: <description>"
+2. Proceed immediately with the next step — **do not ask for confirmation**
+3. Continue until all remaining steps are done or the limit is hit again
 
-When the full task is complete, mark the checkpoint done:
+When the full task is complete, update the checkpoint:
 
 ```bash
 sed -i '' 's/status: in_progress/status: completed/' ~/.claude/recovery/checkpoint.md
 ```
+
+---
+
+## Hook Setup (required for auto-resume)
+
+The SessionStart hook must be registered in `~/.claude/settings.json`:
+
+```json
+"hooks": {
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash ~/.claude/skills/session-limit-recovery/hooks/session-start.sh"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The `install.sh` script does this automatically.
 
 ---
 
